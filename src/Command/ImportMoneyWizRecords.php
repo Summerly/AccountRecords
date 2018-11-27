@@ -2,6 +2,7 @@
 
 namespace App\Command;
 
+use App\Entity\Record;
 use Doctrine\Common\Persistence\ObjectManager;
 use League\Csv\Reader;
 use Symfony\Component\Console\Command\Command;
@@ -58,15 +59,40 @@ class ImportMoneyWizRecords extends Command
         $csv = Reader::createFromPath($csvPath, 'r');
 
         $totalCount = 0;
+        $batchSize = 500;
 
         foreach ($csv as $index => $data) {
             if ($index === 0) {
                 continue;
             }
 
-            dump($data[4]);
-            ++$totalCount;
+            $account = $data[1];
+            $description = $data[4];
+            $category = $data[5];
+            $datetime = \DateTime::createFromFormat('Y/m/d H:i', $data[6] . ' ' . $data[7]);
+            $amount = floatval(preg_replace('/[^-0-9\.]/', '', $data[9]));;
+            $currency = $data[10];
+            $tags = $data[12];
+
+            $record = new Record();
+            $record->setAccount($account);
+            $record->setDescription($description);
+            $record->setCategory($category);
+            $record->setDatetime($datetime ? $datetime : (new \DateTime()));
+            $record->setAmount($amount);
+            $record->setCurrency($currency);
+            $record->setTags($tags);
+            if ($record->getDescription()) {
+                $em->persist($record);
+                ++$totalCount;
+            }
+            
+            if (0 == ($totalCount % $batchSize)) {
+                $em->flush();
+            }
         }
+
+        $em->flush();
 
         $io->writeln("$totalCount");
     }
