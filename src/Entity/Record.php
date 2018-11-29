@@ -174,4 +174,13 @@ class Record
 
         return $this;
     }
+
+    public function getRecordedAt(): string
+    {
+        if ($this->getDatetime()) {
+            return $this->getDatetime()->format('Y-m-d H:i');
+        }
+
+        return '';
+    }
 }

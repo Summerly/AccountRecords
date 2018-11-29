@@ -84,9 +84,10 @@ class ImportMoneyWizRecords extends Command
             $record->setTags($tags);
             if ($record->getDescription()) {
                 $em->persist($record);
+                $io->writeln("Import: {$record->getRecordedAt()} {$record->getDescription()} {$record->getAmount()} {$record->getCurrency()}");
                 ++$totalCount;
             }
-            
+
             if (0 == ($totalCount % $batchSize)) {
                 $em->flush();
             }
@@ -94,7 +95,7 @@ class ImportMoneyWizRecords extends Command
 
         $em->flush();
 
-        $io->writeln("$totalCount");
+        $io->writeln("Import {$totalCount} Records");
     }
 
 }
