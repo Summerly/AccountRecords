@@ -3,10 +3,8 @@
 {% block title %}Hello {{ controller_name }}!{% endblock %}
 
 {% block body %}
-    <div class="count">
-        {{ pagination.getTotalItemCount }}
-    </div>
-    <table>
+    <table class="table">
+        <thead class="thead-dark">
         <tr>
             <th>{{ knp_pagination_sortable(pagination, 'Id', 'r.id') }}</th>
             <th{% if pagination.isSorted('a.DateTime') %} class="sorted"{% endif %}>
@@ -14,6 +12,7 @@
             </th>
             <th>{{ knp_pagination_sortable(pagination, 'Amount', ['r.Amount', 'r.DateTime']) }}</th>
         </tr>
+        </thead>
 
         {% for record in pagination %}
             <tr {% if loop.index is odd %}class="color"{% endif %}>
