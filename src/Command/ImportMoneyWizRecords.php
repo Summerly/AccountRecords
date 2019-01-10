@@ -3,21 +3,22 @@
 namespace App\Command;
 
 use App\Entity\Record;
-use Doctrine\Common\Persistence\ObjectManager;
+use Doctrine\ORM\EntityManagerInterface;
 use League\Csv\Reader;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 class ImportMoneyWizRecords extends Command
 {
-    private $objectManager;
+    private $entityManager;
 
-    public function __construct(ObjectManager $objectManager)
+    public function __construct(EntityManagerInterface $entityManager)
     {
-        $this->objectManager = $objectManager;
+        $this->entityManager = $entityManager;
 
         parent::__construct();
     }
@@ -26,9 +27,15 @@ class ImportMoneyWizRecords extends Command
     {
         $this
             ->setName('app:import-money-wiz-records')
-            ->addArgument('csv', InputArgument::REQUIRED, 'The Path Of The MoneyWiz Record CSV File.')
             ->setDescription('Import MoneyWiz Records.')
-            ->setHelp('This command allows you to import MoneyWiz Records.');
+            ->setHelp('This command allows you to import MoneyWiz Records.')
+            ->setDefinition(
+                new InputDefinition([
+                    new InputOption('empty-existing-data'),
+                    new InputOption('dummy-import'),
+                    new InputOption('csv', null, InputOption::VALUE_REQUIRED)
+                ])
+            );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -38,22 +45,34 @@ class ImportMoneyWizRecords extends Command
         $dateFormat = 'Y-m-d H:i:s';
 
         $io = new SymfonyStyle($input, $output);
-        $csvPath = $input->getArgument('csv');
+
+        if ($input->getOption('empty-existing-data')) {
+            $connection = $this->entityManager->getConnection();
+            $platform = $connection->getDatabasePlatform();
+
+            $connection->executeUpdate($platform->getTruncateTableSQL('record', true));
+        }
+
+        $csvPath = $input->getOption('csv');
 
         $io->title($this->getName());
-        $io->writeln('Start at ' . date($dateFormat));
+        $startTime = new \DateTime();
+
+        $io->writeln('Start at ' . date($dateFormat, $startTime->getTimestamp()));
 
         if (!file_exists($csvPath)) {
             $io->error("$csvPath does not exist.");
             return;
         }
 
-        $this->import($this->objectManager, $io, $csvPath);
+        $this->import($this->entityManager, $io, $csvPath, $input->getOption('dummy-import'));
 
-        $io->writeln('End at ' . date($dateFormat));
+        $endTime = new \DateTime();
+        $io->writeln('End at ' . date($dateFormat, $endTime->getTimestamp()));
+        $io->writeln('Spend Time: ' . $endTime->diff($startTime)->format('%ss'));
     }
 
-    private function import(ObjectManager $em, SymfonyStyle $io, string $csvPath)
+    private function import(EntityManagerInterface $em, SymfonyStyle $io, string $csvPath, bool $isDummyImport)
     {
 
         $csv = Reader::createFromPath($csvPath, 'r');
@@ -84,16 +103,18 @@ class ImportMoneyWizRecords extends Command
             $record->setTags($tags);
             if ($record->getDescription()) {
                 $em->persist($record);
-                $io->writeln("Import: {$record->getRecordedAt()} {$record->getDescription()} {$record->getAmount()} {$record->getCurrency()}");
+                $io->writeln("Import: {$record->getDetail()}");
                 ++$totalCount;
             }
 
-            if (0 == ($totalCount % $batchSize)) {
+            if (0 == ($totalCount % $batchSize) && !$isDummyImport) {
                 $em->flush();
             }
         }
 
-        $em->flush();
+        if (!$isDummyImport) {
+            $em->flush();
+        }
 
         $io->writeln("Import {$totalCount} Records");
     }

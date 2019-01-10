@@ -183,4 +183,9 @@ class Record
 
         return '';
     }
+
+    public function getDetail(): string
+    {
+        return "{$this->getRecordedAt()} {$this->getDescription()} {$this->getAmount()}{$this->getCurrency()}";
+    }
 }
